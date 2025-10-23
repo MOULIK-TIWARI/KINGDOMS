@@ -1,135 +1,82 @@
-import express from 'express';
-import { InitResponse, IncrementResponse, DecrementResponse } from '../shared/types/api';
-import { redis, reddit, createServer, context, getServerPort } from '@devvit/web/server';
-import { createPost } from './core/post';
+// In: src/server/index.ts
+import { Devvit } from '@devvit/public-api';
 
-const app = express();
+// --- 1. Define Initial Game State (from your README) ---
+const INITIAL_GAME_STATE = {
+  players: {}, // Starts empty
+  factions: {
+    "Fire":  { "HP": 100, "Score": 10, "CurrentVote": null, "Target": null },
+    "Water": { "HP": 100, "Score": 10, "CurrentVote": null, "Target": null },
+    "Earth": { "HP": 100, "Score": 10, "CurrentVote": null, "Target": null },
+    "Air":   { "HP": 100, "Score": 10, "CurrentVote": null, "Target": null }
+  },
+  turnNumber: 1,
+  gameLog: ["Turn 0: The game has begun!"]
+};
 
-// Middleware for JSON body parsing
-app.use(express.json());
-// Middleware for URL-encoded body parsing
-app.use(express.urlencoded({ extended: true }));
-// Middleware for plain text body parsing
-app.use(express.text());
-
-const router = express.Router();
-
-router.get<{ postId: string }, InitResponse | { status: string; message: string }>(
-  '/api/init',
-  async (_req, res): Promise<void> => {
-    const { postId } = context;
-
-    if (!postId) {
-      console.error('API Init Error: postId not found in devvit context');
-      res.status(400).json({
-        status: 'error',
-        message: 'postId is required but missing from context',
-      });
-      return;
-    }
-
-    try {
-      const [count, username] = await Promise.all([
-        redis.get('count'),
-        reddit.getCurrentUsername(),
-      ]);
-
-      res.json({
-        type: 'init',
-        postId: postId,
-        count: count ? parseInt(count) : 0,
-        username: username ?? 'anonymous',
-      });
-    } catch (error) {
-      console.error(`API Init Error for post ${postId}:`, error);
-      let errorMessage = 'Unknown error during initialization';
-      if (error instanceof Error) {
-        errorMessage = `Initialization failed: ${error.message}`;
-      }
-      res.status(400).json({ status: 'error', message: errorMessage });
-    }
-  }
-);
-
-router.post<{ postId: string }, IncrementResponse | { status: string; message: string }, unknown>(
-  '/api/increment',
-  async (_req, res): Promise<void> => {
-    const { postId } = context;
-    if (!postId) {
-      res.status(400).json({
-        status: 'error',
-        message: 'postId is required',
-      });
-      return;
-    }
-
-    res.json({
-      count: await redis.incrBy('count', 1),
-      postId,
-      type: 'increment',
-    });
-  }
-);
-
-router.post<{ postId: string }, DecrementResponse | { status: string; message: string }, unknown>(
-  '/api/decrement',
-  async (_req, res): Promise<void> => {
-    const { postId } = context;
-    if (!postId) {
-      res.status(400).json({
-        status: 'error',
-        message: 'postId is required',
-      });
-      return;
-    }
-
-    res.json({
-      count: await redis.incrBy('count', -1),
-      postId,
-      type: 'decrement',
-    });
-  }
-);
-
-router.post('/internal/on-app-install', async (_req, res): Promise<void> => {
-  try {
-    const post = await createPost();
-
-    res.json({
-      status: 'success',
-      message: `Post created in subreddit ${context.subredditName} with id ${post.id}`,
-    });
-  } catch (error) {
-    console.error(`Error creating post: ${error}`);
-    res.status(400).json({
-      status: 'error',
-      message: 'Failed to create post',
-    });
-  }
+// --- 2. Configure Devvit & Set Initial Storage ---
+Devvit.configure({
+  // This event runs ONCE when you install your app
+  onInstall: async (context) => {
+    // Set the starting game state in storage
+    await context.storage.setItem('gameState', JSON.stringify(INITIAL_GAME_STATE));
+    
+    // Send a log to the terminal!
+    console.log('Game installed successfully. Initial storage set.');
+  },
 });
 
-router.post('/internal/menu/post-create', async (_req, res): Promise<void> => {
-  try {
-    const post = await createPost();
+// --- 3. API Functions (The Contract) ---
 
-    res.json({
-      navigateTo: `https://reddit.com/r/${context.subredditName}/comments/${post.id}`,
-    });
-  } catch (error) {
-    console.error(`Error creating post: ${error}`);
-    res.status(400).json({
-      status: 'error',
-      message: 'Failed to create post',
-    });
-  }
+// REAL FUNCTION (Read-Only)
+async function getGameState(event: any, context: Devvit.Context) {
+  console.log('getGameState was called'); // Log the call
+  const stateString = await context.storage.getItem('gameState');
+  return JSON.parse(stateString); // Send back the game state
+}
+
+// REAL FUNCTION (Read-Only)
+async function getPlayerFaction(event: { username: string }, context: Devvit.Context) {
+  const { username } = event;
+  console.log(`getPlayerFaction was called for ${username}`);
+  const state = JSON.parse(await context.storage.getItem('gameState'));
+  return state.players[username] || null; 
+}
+
+// STUB FUNCTION (Write)
+async function joinFaction(event: { username: string, factionName: string }, context: Devvit.Context) {
+  const { username, factionName } = event;
+  console.log(`STUB: ${username} is trying to join ${factionName}`);
+  
+  // TODO: On Day 3, we will add the logic here.
+  
+  return { success: true, message: "Stub: Join faction not yet implemented." };
+}
+
+// STUB FUNCTION (Write)
+async function submitPlayerAction(event: { username: string, action: string, targetFaction: string | null }, context: Devvit.Context) {
+  const { username, action, targetFaction } = event;
+  console.log(`STUB: ${username} trying to ${action} ${targetFaction || ''}`);
+  
+  // TODO: On Day 3, we will add logic here.
+  
+  return { success: true, message: "Stub: Submit action not yet implemented." };
+}
+
+// --- 4. Expose Functions to Frontend ---
+// This "opens the doors" so the frontend can call your functions
+Devvit.addCustomPostHandler('getGameState', getGameState);
+Devvit.addCustomPostHandler('getPlayerFaction', getPlayerFaction);
+Devvit.addCustomPostHandler('joinFaction', joinFaction);
+Devvit.addCustomPostHandler('submitPlayerAction', submitPlayerAction);
+
+// We will also add this one (a stub for now)
+Devvit.addSchedulerJob({
+  name: 'processTurn',
+  onRun: async (event, context) => {
+    console.log('STUB: Scheduled job "processTurn" ran, but has NO LOGIC!');
+    // TODO: On Day 4, we will build this.
+  },
 });
 
-// Use router middleware
-app.use(router);
-
-// Get port from environment variable with fallback
-const port = getServerPort();
-
-const server = createServer(app);
-server.on('error', (err) => console.error(`server error; ${err.stack}`));
-server.listen(port);
+export default Devvit;
