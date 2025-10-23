@@ -1,15 +1,16 @@
-// web/src/components/Leaderboard.js
 import React from 'react';
-import { FAKE_GAME_STATE } from '../fakeData'; // Note the .. to go up one directory
+// REMOVED: import { FAKE_GAME_STATE } ...
 
-function Leaderboard() {
-  const factions = Object.entries(FAKE_GAME_STATE.factions);
+// Get 'factions' from the props (passed by App.js)
+function Leaderboard({ factions }) {
+  // Use the 'factions' prop directly
+  const factionEntries = Object.entries(factions);
 
   return (
     <div className="leaderboard">
       <h3>Leaderboard</h3>
       <ul>
-        {factions.map(([name, stats]) => (
+        {factionEntries.map(([name, stats]) => (
           <li key={name}>
             <strong>{name}</strong> - HP: {stats.HP}, Score: {stats.Score}
           </li>

@@ -1,7 +1,7 @@
-// web/src/components/FactionSelection.js
 import React from 'react';
 
-function FactionSelection() {
+// Get 'setPlayerFaction' from the props (passed by App.js)
+function FactionSelection({ setPlayerFaction }) {
   const factions = ["Fire", "Water", "Earth", "Air"];
 
   return (
@@ -9,7 +9,7 @@ function FactionSelection() {
       <h2>Choose Your Faction</h2>
       <div className="faction-buttons">
         {factions.map(faction => (
-          <button key={faction} onClick={() => console.log(`Clicked JOIN ${faction}`)}>
+          <button key={faction} onClick={() => setPlayerFaction(faction)}>
             Join {faction}
           </button>
         ))}
