@@ -43,24 +43,58 @@ async function getPlayerFaction(event: { username: string }, context: Devvit.Con
   return state.players[username] || null; 
 }
 
-// STUB FUNCTION (Write)
+// REAL IMPLEMENTATION (ADD THIS)
+//JOIN FACTION LOGIC 
 async function joinFaction(event: { username: string, factionName: string }, context: Devvit.Context) {
   const { username, factionName } = event;
-  console.log(`STUB: ${username} is trying to join ${factionName}`);
+
+  // 1. Get the current state
+  const stateString = await context.storage.getItem('gameState');
+  const state = JSON.parse(stateString);
+
+  // 2. Check if player already joined
+  if (state.players[username]) {
+    console.log(`ERROR: ${username} tried to join but is already in ${state.players[username]}`);
+    return { success: false, message: "You have already joined a faction." };
+  }
+
+  // 3. Mutate the state (Add the player)
+  state.players[username] = factionName;
+  state.gameLog.push(`${username} has joined the ${factionName} faction!`);
+  console.log(`SUCCESS: ${username} joined ${factionName}.`);
+
+  // 4. Save the NEW state back to storage
+  await context.storage.setItem('gameState', JSON.stringify(state));
   
-  // TODO: On Day 3, we will add the logic here.
-  
-  return { success: true, message: "Stub: Join faction not yet implemented." };
+  return { success: true, message: "Welcome!" };
 }
 
-// STUB FUNCTION (Write)
+
+// REAL IMPLEMENTATION (ADD THIS)
+//SUBMIT PLAYER ACTION LOGIC
 async function submitPlayerAction(event: { username: string, action: string, targetFaction: string | null }, context: Devvit.Context) {
   const { username, action, targetFaction } = event;
-  console.log(`STUB: ${username} trying to ${action} ${targetFaction || ''}`);
+
+  // 1. Get the current state
+  const stateString = await context.storage.getItem('gameState');
+  const state = JSON.parse(stateString);
+
+  // 2. Find the player's faction
+  const playerFaction = state.players[username];
+  if (!playerFaction) {
+    console.log(`ERROR: ${username} tried to vote but has no faction.`);
+    return { success: false, message: "You must join a faction to act." };
+  }
+
+  // 3. Mutate the state (Save the vote)
+  state.factions[playerFaction].CurrentVote = action;
+  state.factions[playerFaction].Target = targetFaction; // This will be null if action is 'Defend' or 'Train'
+  console.log(`SUCCESS: ${username} (${playerFaction}) submitted vote: ${action} ${targetFaction || ''}`);
+
+  // 4. Save the NEW state back to storage
+  await context.storage.setItem('gameState', JSON.stringify(state));
   
-  // TODO: On Day 3, we will add logic here.
-  
-  return { success: true, message: "Stub: Submit action not yet implemented." };
+  return { success: true, message: "Action locked in!" };
 }
 
 // --- 4. Expose Functions to Frontend ---
