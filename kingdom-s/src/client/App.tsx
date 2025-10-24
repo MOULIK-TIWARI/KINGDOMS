@@ -1,61 +1,98 @@
-import { navigateTo } from '@devvit/web/client';
-import { useCounter } from './hooks/useCounter';
+// In: src/client/App.tsx
+import React, { useState, useEffect, useContext } from 'react';
+// 1. Import Devvit.Context and useCurrentUser
+import { Devvit, useCurrentUser } from '@devvit/public-api';
 
-export const App = () => {
-  const { count, username, loading, increment, decrement } = useCounter();
+// 2. Import your components
+import Leaderboard from './components/Leaderboard';
+import ActionPanel from './components/ActionPanel';
+import GameLog from './components/GameLog';
+import FactionSelection from './components/FactionSelection';
+
+function App() {
+  // 3. Get Devvit's magic tools
+  const { devvit } = useContext(Devvit.Context);
+  const currentUser = useCurrentUser();
+
+  // 4. Create REAL state to hold your data
+  const [gameState, setGameState] = useState(null);
+  const [playerFaction, setPlayerFaction] = useState(null);
+
+  // 5. This function fetches ALL data from the backend
+  const fetchData = async () => {
+    if (!currentUser) return; // Don't fetch if no user
+
+    console.log("Fetching game state...");
+    // 6. Use 'callCustomPost', not 'callPlugin'
+    const state = await devvit.callCustomPost('getGameState', {});
+    const faction = await devvit.callCustomPost('getPlayerFaction', { 
+      username: currentUser.username 
+    });
+
+    setGameState(state);
+    setPlayerFaction(faction);
+    console.log("Data fetched!", state, faction);
+  };
+
+  // 7. This runs ONCE when the app loads
+  useEffect(() => {
+    fetchData();
+  }, [currentUser]); // Re-run if the user changes
+
+  // 8. These are your "write" functions
+  const handleJoinFaction = async (factionName: string) => {
+    console.log(`Attempting to join ${factionName}...`);
+    await devvit.callCustomPost('joinFaction', {
+      username: currentUser.username,
+      factionName: factionName,
+    });
+    fetchData(); // After joining, refresh all data to update the UI
+  };
+
+  const handleSubmitAction = async (action: string, target: string | null) => {
+    console.log(`Attempting to ${action} ${target || ''}...`);
+    await devvit.callCustomPost('submitPlayerAction', {
+      username: currentUser.username,
+      action: action,
+      targetFaction: target,
+    });
+    fetchData(); // After submitting, refresh all data to update the UI
+  };
+
+  // --- RENDER LOGIC ---
+
+  // Show a loading screen while data is fetched
+  if (!gameState || !currentUser) {
+    return <h1>Loading...</h1>;
+  }
+
+  // The logic is now based on REAL state
+  const hasJoinedFaction = playerFaction !== null;
+
   return (
-    <div className="flex relative flex-col justify-center items-center min-h-screen gap-4">
-      <img className="object-contain w-1/2 max-w-[250px] mx-auto" src="/snoo.png" alt="Snoo" />
-      <div className="flex flex-col items-center gap-2">
-        <h1 className="text-2xl font-bold text-center text-gray-900 ">
-          {username ? `Hey ${username} 👋` : ''}
-        </h1>
-        <p className="text-base text-center text-gray-600 ">
-          Edit <span className="bg-[#e5ebee]  px-1 py-0.5 rounded">src/client/App.tsx</span> to get
-          started.
-        </p>
-      </div>
-      <div className="flex items-center justify-center mt-5">
-        <button
-          className="flex items-center justify-center bg-[#d93900] text-white w-14 h-14 text-[2.5em] rounded-full cursor-pointer font-mono leading-none transition-colors"
-          onClick={decrement}
-          disabled={loading}
-        >
-          -
-        </button>
-        <span className="text-[1.8em] font-medium mx-5 min-w-[50px] text-center leading-none text-gray-900">
-          {loading ? '...' : count}
-        </span>
-        <button
-          className="flex items-center justify-center bg-[#d93900] text-white w-14 h-14 text-[2.5em] rounded-full cursor-pointer font-mono leading-none transition-colors"
-          onClick={increment}
-          disabled={loading}
-        >
-          +
-        </button>
-      </div>
-      <footer className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-3 text-[0.8em] text-gray-600">
-        <button
-          className="cursor-pointer"
-          onClick={() => navigateTo('https://developers.reddit.com/docs')}
-        >
-          Docs
-        </button>
-        <span className="text-gray-300">|</span>
-        <button
-          className="cursor-pointer"
-          onClick={() => navigateTo('https://www.reddit.com/r/Devvit')}
-        >
-          r/Devvit
-        </button>
-        <span className="text-gray-300">|</span>
-        <button
-          className="cursor-pointer"
-          onClick={() => navigateTo('https://discord.com/invite/R7yu2wh9Qz')}
-        >
-          Discord
-        </button>
-      </footer>
+    <div>
+      <h1>Kingdoms Factions (Real)</h1>
+      <p>Welcome, {currentUser.username}!</p>
+      
+      {hasJoinedFaction ? (
+        // If player has joined, show the game
+        <>
+          <p>You are in the {playerFaction} Faction.</p>
+          {/* Pass the real data to your components (uncomment these) */}
+          {/* <Leaderboard gameState={gameState} /> */}
+          {/* <ActionPanel onSubmit={handleSubmitAction} /> */}
+          {/* <GameLog gameState={gameState} /> */}
+        </>
+      ) : (
+        // If player has NOT joined, show the join screen
+        <>
+          <h2>Welcome! Choose your Faction:</h2>
+          {/* Pass the real function to your component (uncomment this) */}
+          {/* <FactionSelection onJoin={handleJoinFaction} /> */}
+        </>
+      )}
     </div>
   );
-};
+}
+
+export default App;
